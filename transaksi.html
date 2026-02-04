@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PustakaHub - Manajemen Transaksi</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <style>
+        :root {
+            --blueberry: #2C3F70; --strawberry: #A5231C; --buttercream: #C8D4E5;
+            --violet: #8089D2; --meringe: #E8EBED;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background-color: var(--meringe); display: flex; min-height: 100vh; }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 260px; background-color: var(--blueberry); color: white;
+            padding: 30px 20px; position: fixed; height: 100vh;
+            display: flex; flex-direction: column; z-index: 100;
+        }
+        .sidebar h2 { font-size: 1.4rem; text-align: center; margin-bottom: 40px; font-weight: 800; }
+        .sidebar nav a {
+            display: block; color: var(--buttercream); text-decoration: none;
+            padding: 12px 15px; margin-bottom: 8px; border-radius: 12px;
+            font-size: 0.95rem; transition: 0.3s;
+        }
+        .sidebar nav a:hover, .sidebar nav a.active { background-color: var(--violet); color: white; transform: translateX(5px); }
+
+        /* --- MAIN CONTENT --- */
+        .main-content { flex: 1; margin-left: 260px; padding: 40px; }
+        .header-section { margin-bottom: 30px; }
+        .header-section h1 { color: var(--blueberry); font-size: 1.8rem; }
+
+        /* --- 4 KARTU STATISTIK --- */
+        .filter-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 15px; margin-bottom: 35px;
+        }
+
+        .filter-card {
+            background: white; padding: 20px; border-radius: 20px;
+            border: 2px solid transparent; cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.02);
+        }
+
+        .filter-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.05); }
+        .filter-card.active { border-color: var(--violet); background-color: #f8f9ff; }
+
+        .filter-card span { font-size: 0.7rem; color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .filter-card h2 { color: var(--blueberry); margin-top: 5px; font-size: 1.5rem; }
+
+        /* --- TABLE --- */
+        .table-container {
+            background: white; border-radius: 20px; overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.03); border: 1px solid rgba(200,212,229,0.5);
+        }
+        table { width: 100%; border-collapse: collapse; }
+        thead { background-color: var(--buttercream); }
+        th { padding: 18px; text-align: left; color: var(--blueberry); font-size: 0.7rem; text-transform: uppercase; }
+        td { padding: 18px; border-bottom: 1px solid var(--meringe); font-size: 0.85rem; color: #444; }
+
+        .badge { padding: 5px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; display: inline-block; }
+        .pending { background: #fff4e5; color: #b7791f; }
+        .dipinjam { background: #dcfce7; color: #15803d; }
+        .kembali { background: #f3f4f6; color: #6b7280; }
+        .telat { background: #fee2e2; color: var(--strawberry); }
+
+        .btn-acc { background: var(--violet); color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-done { background: var(--blueberry); color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <h2>PUSTAKAHUB</h2>
+        <nav>
+            <a href="gudang.html">Lihat Katalog</a>
+            <a href="admin-dashboard.html">Kelola Buku</a>
+            <a href="transaksi.html" class="active">Transaksi Pinjam</a>
+            <a href="members.html">Data Member</a>
+            <a href="#" style="margin-top: auto; color: #ff9999;">Logout</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="header-section">
+            <h1>Laporan Transaksi</h1>
+            <p style="color: #888;">Monitor arus buku dan riwayat peminjaman.</p>
+        </header>
+
+        <div class="filter-grid" id="statsGrid">
+            <div class="filter-card active" onclick="renderTable('all')">
+                <span>Riwayat Transaksi</span>
+                <h2 id="countAll">0 <small style="font-size: 0.8rem; font-weight: 400;">Total</small></h2>
+            </div>
+            <div class="filter-card" onclick="renderTable('Dipinjam')">
+                <span>Sedang Dipinjam</span>
+                <h2 style="color: var(--violet);" id="countPinjam">0 <small style="font-size: 0.8rem; font-weight: 400;">Buku</small></h2>
+            </div>
+            <div class="filter-card" onclick="renderTable('Pending')">
+                <span>Menunggu ACC</span>
+                <h2 style="color: #b7791f;" id="countPending">0 <small style="font-size: 0.8rem; font-weight: 400;">Request</small></h2>
+            </div>
+            <div class="filter-card danger">
+                <span>Total Denda</span>
+                <h2 style="color: var(--strawberry);" id="totalDenda">Rp 0</h2>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID TRX</th>
+                        <th>Peminjam</th>
+                        <th>Buku</th>
+                        <th>Tanggal</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="trxTable">
+                    <tr><td colspan="6" style="text-align: center;">Mengambil data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        let rawData = [];
+
+        async function fetchTransactions() {
+            const { data, error } = await supabase.from('riwayat').select('*').order('id_riwayat', { ascending: false });
+            if (error) return console.error(error);
+            rawData = data;
+            updateStats();
+            renderTable('all');
+        }
+
+        function updateStats() {
+            document.getElementById('countAll').innerHTML = `${rawData.length} <small style="font-size: 0.8rem; font-weight: 400;">Total</small>`;
+            document.getElementById('countPinjam').innerHTML = `${rawData.filter(d => d.status === 'Dipinjam').length} <small style="font-size: 0.8rem; font-weight: 400;">Buku</small>`;
+            document.getElementById('countPending').innerHTML = `${rawData.filter(d => d.status === 'Pending').length} <small style="font-size: 0.8rem; font-weight: 400;">Request</small>`;
+        }
+
+        function renderTable(filter) {
+            const tbody = document.getElementById('trxTable');
+            const displayData = filter === 'all' ? rawData : rawData.filter(d => d.status === filter);
+            
+            // Toggle active class on cards
+            document.querySelectorAll('.filter-card').forEach(card => card.classList.remove('active'));
+
+            tbody.innerHTML = displayData.map(trx => {
+                let btn = '';
+                if(trx.status === 'Pending') btn = `<button class="btn-acc" onclick="changeStatus(${trx.id_riwayat}, 'Dipinjam')">Setujui</button>`;
+                else if(trx.status === 'Dipinjam') btn = `<button class="btn-done" onclick="changeStatus(${trx.id_riwayat}, 'Kembali')">Selesai</button>`;
+                else btn = '✅';
+
+                return `
+                    <tr>
+                        <td>#${trx.id_riwayat}</td>
+                        <td><strong>${trx.username}</strong></td>
+                        <td>${trx.judul_buku}</td>
+                        <td>${trx.tanggal_pinjam}</td>
+                        <td><span class="badge ${trx.status.toLowerCase()}">${trx.status}</span></td>
+                        <td>${btn}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function changeStatus(id, newStatus) {
+            const { error } = await supabase.from('riwayat').update({ status: newStatus }).eq('id_riwayat', id);
+            if (error) alert(error.message);
+            else fetchTransactions();
+        }
+
+        window.onload = fetchTransactions;
+    </script>
+</body>
+</html>

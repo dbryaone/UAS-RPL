@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PustakaHub - Riwayat Pinjaman</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --blueberry: #2C3F70; --strawberry: #A5231C; --buttercream: #C8D4E5;
+            --violet: #8089D2; --meringe: #E8EBED; --white: #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background-color: var(--meringe); color: var(--blueberry); min-height: 100vh; display: flex; flex-direction: column; }
+
+        nav {
+            background-color: var(--blueberry); padding: 1rem 5%; display: flex;
+            justify-content: space-between; align-items: center; color: white;
+            position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .logo { font-weight: 800; font-size: 1.5rem; letter-spacing: 1px; }
+        .nav-links a {
+            color: white; text-decoration: none; margin-left: 20px;
+            font-size: 0.9rem; font-weight: 600; transition: 0.3s;
+        }
+        .nav-links a:hover { color: var(--violet); }
+
+        .main-wrapper { flex: 1; padding-bottom: 40px; }
+        .container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+
+        .header-page { margin-bottom: 30px; }
+        .header-page h1 { font-size: 1.8rem; margin-bottom: 5px; font-weight: 800; }
+        .header-page p { color: #666; font-size: 0.95rem; }
+
+        .card-riwayat {
+            background: white; padding: 25px; border-radius: 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 15px; box-shadow: 0 10px 20px rgba(44, 63, 112, 0.03);
+            border: 1px solid rgba(200,212,229,0.5); transition: 0.3s ease;
+        }
+        .card-riwayat:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(44, 63, 112, 0.08); }
+
+        .book-detail h3 { font-size: 1.2rem; margin-bottom: 5px; color: var(--blueberry); }
+        .book-detail p { font-size: 0.85rem; color: #718096; }
+
+        .status-info { text-align: right; }
+        .badge {
+            display: inline-block; padding: 8px 16px; border-radius: 12px;
+            font-size: 0.75rem; font-weight: 800; margin-bottom: 8px;
+        }
+
+        .status-pending { background-color: #fef3c7; color: #92400e; }
+        .status-pinjam { background-color: #dbeafe; color: #1e40af; }
+        .status-kembali { background-color: #dcfce7; color: #166534; }
+
+        .deadline { display: block; font-size: 0.75rem; font-weight: 700; color: var(--strawberry); }
+
+        footer { background-color: var(--blueberry); color: white; padding: 1.5rem 5%; text-align: center; }
+        .footer-bottom { font-size: 0.9rem; font-weight: 600; opacity: 0.9; letter-spacing: 0.5px; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo">PUSTAKAHUB</div>
+        <div class="nav-links">
+            <a href="index.html">Beranda</a>
+            <a href="gudang.html">Katalog</a>
+            <a href="riwayat.html" style="color: var(--violet);">Riwayat</a>
+            <a href="profil.html">Profil</a>
+        </div>
+    </nav>
+
+    <div class="main-wrapper">
+        <div class="container">
+            <div class="header-page">
+                <h1>Halo, <span id="userNameDisplay">Yang Mulia</span>!</h1>
+                <p>Berikut adalah jejak literasi Anda di PustakaHub.</p>
+            </div>
+            <div id="daftar-riwayat">
+                <p style="text-align: center; margin-top: 50px; opacity: 0.6;">Membuka catatan arsip...</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-bottom">
+            &copy; 2026 PustakaHub Digital. Teman setia di waktu luangmu.
+        </div>
+    </footer>
+
+    <script>
+        // Konfigurasi Supabase
+        const { createClient } = supabase;
+        const supabaseUrl = 'https://nonsupyphoweqghuslwy.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbnN1cHlwaG93ZXFnaHVzbHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMDY3NjcsImV4cCI6MjA4NTc4Mjc2N30.3NVxvcBJyADv8Sz_r3etpX6MLTTFQH9Up2lXLYbARBY';
+        const client = createClient(supabaseUrl, supabaseKey);
+
+        async function tambahDataDummy(user) {
+            const dummyData = [
+                {
+                    username: user,
+                    judul_buku: "Seporsi Mie Ayam Sebelum Mati",
+                    tanggal_pinjam: "2026-02-01",
+                    status: "Dipinjam",
+                    deadline: "2026-02-08"
+                },
+                {
+                    username: user,
+                    judul_buku: "Pasta Kacang Merah",
+                    tanggal_pinjam: "2026-01-25",
+                    status: "Kembali",
+                    deadline: "2026-02-01"
+                }
+            ];
+
+            const { error } = await client.from('riwayat').insert(dummyData);
+            if (!error) {
+                console.log("Data laporan berhasil disuntikkan, Yang Mulia!");
+                // Panggil ulang muatRiwayat buat update UI tanpa refresh browser
+                muatRiwayat(); 
+            } else {
+                console.error("Gagal suntik data:", error.message);
+                alert("Waduh, gagal ngisi data riwayat: " + error.message);
+            }
+        }
+
+        async function muatRiwayat() {
+            const container = document.getElementById('daftar-riwayat');
+            const userLogin = localStorage.getItem('username') || 'Yang Mulia';
+            document.getElementById('userNameDisplay').innerText = userLogin;
+
+            try {
+                const { data, error } = await client
+                    .from('riwayat')
+                    .select('*')
+                    .eq('username', userLogin)
+                    .order('id_riwayat', { ascending: false });
+
+                if (error) throw error;
+
+                // Jika database kosong, kita suntik datanya
+                if (!data || data.length === 0) {
+                    await tambahDataDummy(userLogin);
+                    return;
+                }
+
+                container.innerHTML = '';
+
+                data.forEach(item => {
+                    let statusClass = 'status-pending';
+                    if (item.status === 'Dipinjam') statusClass = 'status-pinjam';
+                    if (item.status === 'Kembali') statusClass = 'status-kembali';
+                    
+                    const isKembali = item.status === 'Kembali';
+
+                    container.innerHTML += `
+                        <div class="card-riwayat">
+                            <div class="book-detail">
+                                <h3>${item.judul_buku || 'Buku Tanpa Judul'}</h3>
+                                <p>ID Transaksi: #${item.id_riwayat}</p>
+                                <p>Tanggal Pinjam: ${item.tanggal_pinjam || '-'}</p>
+                            </div>
+                            <div class="status-info">
+                                <span class="badge ${statusClass}">${item.status || 'Pending'}</span>
+                                <span class="deadline">
+                                    ${isKembali ? 'Selesai Baca' : 'Deadline: ' + (item.deadline || 'Menunggu ACC')}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                container.innerHTML = `<p style="text-align:center; padding: 20px;">Gagal muat riwayat: ${err.message}</p>`;
+            }
+        }
+
+        window.onload = muatRiwayat;
+    </script>
+</body>
+</html>

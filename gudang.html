@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PustakaHub - Gudang Koleksi</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        :root {
+            --blueberry: #2C3F70; --strawberry: #A5231C; --buttercream: #C8D4E5;
+            --violet: #8089D2; --meringe: #E8EBED; --white: #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+
+        body {
+            background-color: var(--meringe); color: var(--blueberry);
+            min-height: 100vh; display: flex; flex-direction: column;
+        }
+
+        nav {
+            background-color: var(--blueberry); padding: 1rem 5%;
+            display: flex; justify-content: space-between; align-items: center;
+            color: white; position: sticky; top: 0; z-index: 1000;
+        }
+        .logo { font-weight: 800; font-size: 1.5rem; letter-spacing: 1px; }
+        .nav-links a { color: white; text-decoration: none; margin-left: 20px; font-weight: 600; font-size: 0.9rem; transition: 0.3s; }
+        .nav-links a:hover { color: var(--violet); }
+
+        .gudang-header {
+            padding: 40px 5%; background: white;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--buttercream);
+        }
+        .search-box { position: relative; width: 350px; }
+        .search-box input {
+            width: 100%; padding: 12px 20px; border-radius: 12px;
+            border: 2px solid var(--meringe); outline: none; transition: 0.3s;
+        }
+
+        .koleksi-container { 
+            max-width: 1200px; 
+            margin: 40px auto; 
+            padding: 0 20px; 
+            flex: 1;
+            width: 100%; 
+        }
+        
+        #bookGrid {
+            display: grid !important;
+            /* Settingan Kartu Mungil (160px) biar muat banyak ke samping */
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+            gap: 15px !important;
+            width: 100% !important;
+        }
+
+        .card-buku {
+            background: white !important;
+            padding: 15px !important;
+            border-radius: 15px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            transition: 0.3s !important;
+            height: 100% !important;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05) !important;
+        }
+        
+        .card-buku:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 25px rgba(44, 63, 112, 0.1);
+        }
+
+        .cover-img {
+            width: 100% !important; 
+            height: 220px !important; 
+            object-fit: cover !important;
+            border-radius: 10px !important; 
+            margin-bottom: 10px !important;
+        }
+
+        .card-buku h3 { font-size: 0.9rem; margin-bottom: 5px; color: var(--blueberry); line-height: 1.2; }
+        .card-buku p { color: #666; font-size: 0.75rem; margin-bottom: 12px; flex-grow: 1; }
+        
+        .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .badge { background: var(--meringe); padding: 3px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: 700; }
+        .stok { font-weight: 800; color: var(--strawberry); font-size: 0.8rem; }
+
+        .btn-pinjam {
+            width: 100%; padding: 10px; border: none; border-radius: 10px;
+            background: var(--blueberry); color: white; font-weight: bold;
+            cursor: pointer; transition: 0.3s; font-size: 0.8rem;
+        }
+        .btn-pinjam:hover { background: var(--violet); }
+
+        footer { background-color: var(--blueberry); color: white; padding: 2rem 5%; text-align: center; margin-top: 50px; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo">PUSTAKAHUB</div>
+        <div class="nav-links">
+            <a href="index.html">Beranda</a>
+            <a href="gudang.html" style="color: var(--violet);">Katalog</a>
+            <a href="riwayat.html">Riwayat</a>
+            <a href="profil.html">Profil</a>
+        </div>
+    </nav>
+
+    <div class="gudang-header">
+        <div>
+            <h1>Gudang Koleksi</h1>
+            <p style="color: #666;">Silakan pilih literatur terbaik, **Yang Mulia**.</p>
+        </div>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Cari judul atau penulis..." onkeyup="searchBuku()">
+        </div>
+    </div>
+
+    <div class="koleksi-container">
+        <div id="bookGrid">
+            <div style="grid-column: 1/-1; text-align: center; padding: 50px;">
+                <h2>Menata Rak Buku...</h2>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div>&copy; 2026 PustakaHub Digital.</div>
+    </footer>
+
+    <script>
+        const { createClient } = supabase;
+        const supabaseUrl = 'https://nonsupyphoweqghuslwy.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vbnN1cHlwaG93ZXFnaHVzbHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMDY3NjcsImV4cCI6MjA4NTc4Mjc2N30.3NVxvcBJyADv8Sz_r3etpX6MLTTFQH9Up2lXLYbARBY';
+        const supabaseGudang = createClient(supabaseUrl, supabaseKey);
+
+        let dataBukuLokal = [];
+
+        async function fetchKatalog() {
+            try {
+                const { data, error } = await supabaseGudang.from('buku').select('*');
+                if (error) throw error;
+                dataBukuLokal = data;
+                renderBuku(dataBukuLokal);
+            } catch (err) {
+                document.getElementById('bookGrid').innerHTML = `<h2>Error: ${err.message}</h2>`;
+            }
+        }
+
+        function renderBuku(listBuku) {
+            const container = document.getElementById('bookGrid');
+            container.innerHTML = '';
+
+            if (listBuku.length === 0) {
+                container.innerHTML = '<h2 style="grid-column:1/-1; text-align:center;">Buku tidak ditemukan.</h2>';
+                return;
+            }
+
+            listBuku.forEach(b => {
+                container.innerHTML += `
+                    <div class="card-buku">
+                        <img src="${b.cover_url || 'https://via.placeholder.com/150x220'}" class="cover-img">
+                        <h3>${b.judul}</h3>
+                        <p>${b.pengarang}</p>
+                        <div class="info-row">
+                            <span class="badge">${b.kategori}</span>
+                            <span class="stok">Stok: ${b.stok}</span>
+                        </div>
+                        <button onclick="pinjam(${b.id_buku}, '${b.judul.replace(/'/g, "\\'")}')" class="btn-pinjam">Pinjam</button>
+                    </div>
+                `;
+            });
+        }
+
+        function searchBuku() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            const hasilFilter = dataBukuLokal.filter(b => 
+                b.judul.toLowerCase().includes(keyword) || 
+                b.pengarang.toLowerCase().includes(keyword)
+            );
+            renderBuku(hasilFilter);
+        }
+
+        // --- FUNGSI PINJAM YANG REAL KE DATABASE ---
+        async function pinjam(id, judul) {
+            const nama = prompt(`Pinjam buku "${judul}"?\n\nMasukkan Nama Peminjam, Yang Mulia:`);
+            
+            if (nama && nama.trim() !== "") {
+                try {
+                    const { data, error } = await supabaseGudang
+                        .from('transaksi')
+                        .insert([
+                            { 
+                                id_buku: id, 
+                                nama_peminjam: nama, 
+                                tgl_pinjam: new Date().toISOString(),
+                                status: 'Menunggu Persetujuan' 
+                            }
+                        ]);
+
+                    if (error) throw error;
+
+                    alert("Permintaan terkirim! Admin akan segera memproses pinjaman Yang Mulia.");
+                } catch (err) {
+                    console.error("Gagal transaksi:", err.message);
+                    alert("Waduh, gagal ngirim data ke tabel transaksi: " + err.message);
+                }
+            } else if (nama === "") {
+                alert("Nama peminjam harus diisi ya, Yang Mulia.");
+            }
+        }
+
+        window.onload = fetchKatalog;
+    </script>
+</body>
+</html>

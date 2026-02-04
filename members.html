@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PustakaHub - Manajemen Member</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <style>
+        :root {
+            --blueberry: #2C3F70;
+            --strawberry: #A5231C;
+            --buttercream: #C8D4E5;
+            --violet: #8089D2;
+            --meringe: #E8EBED;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background-color: var(--meringe); display: flex; min-height: 100vh; }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 260px; background-color: var(--blueberry); color: white;
+            padding: 30px 20px; position: fixed; height: 100vh;
+            display: flex; flex-direction: column; z-index: 100;
+        }
+        .sidebar h2 { font-size: 1.4rem; text-align: center; margin-bottom: 40px; font-weight: 800; }
+        .sidebar nav a {
+            display: block; color: var(--buttercream); text-decoration: none;
+            padding: 12px 15px; margin-bottom: 8px; border-radius: 12px;
+            font-size: 0.95rem; transition: 0.3s;
+        }
+        .sidebar nav a:hover, .sidebar nav a.active { background-color: var(--violet); color: white; transform: translateX(5px); }
+
+        /* --- MAIN CONTENT --- */
+        .main-content { flex: 1; margin-left: 260px; padding: 40px; }
+        .header-section { margin-bottom: 30px; }
+        .header-section h1 { color: var(--blueberry); font-size: 1.8rem; }
+
+        /* --- 4 KARTU STATISTIK --- */
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 35px;
+        }
+
+        .filter-card {
+            background: white; padding: 20px; border-radius: 20px;
+            border: 2px solid transparent; cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.02);
+        }
+
+        .filter-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.05); }
+        .filter-card.active { border-color: var(--violet); background-color: #f8f9ff; }
+        .filter-card.danger.active { border-color: var(--strawberry); background-color: #fff8f8; }
+
+        .filter-card span { font-size: 0.7rem; color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .filter-card h2 { color: var(--blueberry); margin-top: 5px; font-size: 1.5rem; }
+
+        /* --- TABLE STYLE --- */
+        .table-container {
+            background: white; border-radius: 20px; overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.03); border: 1px solid rgba(200,212,229,0.5);
+        }
+        table { width: 100%; border-collapse: collapse; }
+        thead { background-color: var(--buttercream); }
+        th { padding: 18px; text-align: left; color: var(--blueberry); font-size: 0.7rem; text-transform: uppercase; }
+        td { padding: 18px; border-bottom: 1px solid var(--meringe); font-size: 0.85rem; color: #444; }
+
+        .badge { padding: 5px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; }
+        .status-aktif { background: #dcfce7; color: #15803d; }
+        .status-clear { background: #f3f4f6; color: #6b7280; }
+
+        .btn-detail { color: var(--violet); text-decoration: none; font-weight: 700; font-size: 0.8rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <h2>PUSTAKAHUB</h2>
+        <nav>
+            <a href="index.html">Lihat Katalog</a>
+            <a href="admin-dashboard.html">Kelola Buku</a>
+            <a href="transaksi.html">Transaksi Pinjam</a>
+            <a href="members.html" class="active">Data Member</a>
+            <a href="login.html" style="margin-top: auto; color: #ff9999;">Logout</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="header-section">
+            <h1>Manajemen Member</h1>
+            <p style="color: #888;">Kelola data anggota dan pantau status peminjaman mereka.</p>
+        </header>
+
+        <div class="filter-grid" id="statsGrid">
+            <div class="filter-card active" onclick="filterMember('all', this)">
+                <span>Total Member</span>
+                <h2 id="statTotal">0 <small style="font-size: 0.8rem; font-weight: 400;">Jiwa</small></h2>
+            </div>
+            <div class="filter-card" onclick="filterMember('pinjam', this)">
+                <span>Sedang Meminjam</span>
+                <h2 style="color: var(--violet);" id="statPinjam">0 <small style="font-size: 0.8rem; font-weight: 400;">Orang</small></h2>
+            </div>
+            <div class="filter-card danger" onclick="filterMember('denda', this)">
+                <span>Kena Denda</span>
+                <h2 style="color: var(--strawberry);">0 <small style="font-size: 0.8rem; font-weight: 400;">Orang</small></h2>
+            </div>
+            <div class="filter-card">
+                <span>Member Baru</span>
+                <h2 style="color: #15803d;">1 <small style="font-size: 0.8rem; font-weight: 400;">Bulan Ini</small></h2>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID Member</th>
+                        <th>Nama Lengkap</th>
+                        <th>Buku Dipegang</th>
+                        <th>Total Denda</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="memberTable">
+                    <tr><td colspan="6" style="text-align: center;">Mengambil data rakyat...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        let allMembers = [];
+
+        async function muatDataMember() {
+            // Kita ambil data dari tabel riwayat untuk mendeteksi member yang aktif
+            const { data, error } = await supabase.from('riwayat').select('*');
+            
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            // Proses data: Kelompokkan berdasarkan username
+            const mapMember = {};
+            data.forEach(item => {
+                if (!mapMember[item.username]) {
+                    mapMember[item.username] = {
+                        nama: item.username,
+                        pinjamCount: 0,
+                        denda: 0
+                    };
+                }
+                if (item.status === 'Dipinjam') {
+                    mapMember[item.username].pinjamCount += 1;
+                }
+            });
+
+            allMembers = Object.values(mapMember);
+            updateKartuStatistik();
+            tampilkanTabel(allMembers);
+        }
+
+        function updateKartuStatistik() {
+            document.getElementById('statTotal').innerHTML = `${allMembers.length} <small style="font-size: 0.8rem; font-weight: 400;">Jiwa</small>`;
+            const lagiPinjam = allMembers.filter(m => m.pinjamCount > 0).length;
+            document.getElementById('statPinjam').innerHTML = `${lagiPinjam} <small style="font-size: 0.8rem; font-weight: 400;">Orang</small>`;
+        }
+
+        function tampilkanTabel(data) {
+            const tbody = document.getElementById('memberTable');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Belum ada member yang beraksi.</td></tr>';
+                return;
+            }
+
+            data.forEach((m, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>#MEM-0${index + 1}</td>
+                        <td><strong>${m.nama}</strong></td>
+                        <td>${m.pinjamCount} Buku</td>
+                        <td>Rp ${m.denda.toLocaleString('id-ID')}</td>
+                        <td>
+                            <span class="badge ${m.pinjamCount > 0 ? 'status-aktif' : 'status-clear'}">
+                                ${m.pinjamCount > 0 ? 'Sedang Pinjam' : 'Clear'}
+                            </span>
+                        </td>
+                        <td><span class="btn-detail" onclick="alert('Detail ${m.nama} akan segera rilis!')">Detail</span></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function filterMember(type, element) {
+            // Gaya-gayaan UI sedikit biar kartu yang aktif berubah warna
+            document.querySelectorAll('.filter-card').forEach(card => card.classList.remove('active'));
+            element.classList.add('active');
+
+            if (type === 'all') {
+                tampilkanTabel(allMembers);
+            } else if (type === 'pinjam') {
+                const filtered = allMembers.filter(m => m.pinjamCount > 0);
+                tampilkanTabel(filtered);
+            } else if (type === 'denda') {
+                const filtered = allMembers.filter(m => m.denda > 0);
+                tampilkanTabel(filtered);
+            }
+        }
+
+        // Jalankan pas halaman kebuka
+        muatDataMember();
+    </script>
+</body>
+</html>
